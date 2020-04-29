@@ -412,10 +412,10 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
             if labels is not None:
                 for block in range(len(labels)):
                     for i in range(len(labels[block])):
-                        if labels[i] == tokenizer.convert_tokens_to_ids('EOA'): #or whatever id is assigned to the [EOA] token
+                        if labels[block][i] == tokenizer.convert_tokens_to_ids('EOA'): #or whatever id is assigned to the [EOA] token
                             break
                         else:
-                            labels[i] = -100
+                            labels[block][i] = -100
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
