@@ -428,12 +428,11 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 for block in range(len(labels)):
                     for i in range(len(labels[block])):
                         if labels[block][i] == tokenizer.convert_tokens_to_ids('[question]'):
-                            # labels[block][i] = -100 # throws an error. Need to find the right label for masking
                             labels[block][i] = mask_token_id
                             break
                         else:
-                            # labels[block][i] = -100 # throws an error
                             labels[block][i] = mask_token_id
+                            
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()

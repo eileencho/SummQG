@@ -171,4 +171,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Trash
+zmorgue/*
+
 # End of https://www.gitignore.io/api/vim,data,macos,emacs,windows,jupyternotebooks

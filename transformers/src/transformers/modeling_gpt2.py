@@ -603,8 +603,21 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         outputs = (lm_logits,) + transformer_outputs[1:]
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :].contiguous()
+            shift_logits = lm_logits[..., :-1, :].contiguous() #lm_logits should be size of vocab? based on linear layer above?
+            # for i in range(len(shift_logits)):
+                ## I'm assuming labels here are the word, still trying to go through the code and figure it out.
+                ## Which means that if we want logits to match our labels, they must also be the word
+                # if shift_logits[...,i] == 4: #use whatever number our end of answer token corresponds to
+                #    break
+                # else:
+                #    shift_logits[...,i]=-100 #this is usually the unknown token, I think?
             shift_labels = labels[..., 1:].contiguous()
+            # for i in range(len(shift_labels)):
+                ## I'm assuming labels here are the word, still trying to go through the code and figure it out.
+                # if shift_labels[...,i] == 4: #use whatever number our end of answer token corresponds to:
+                #    break
+                # else:
+                #    shift_labels[...,i]=-100 #this is usually the unknown token, I think?
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
