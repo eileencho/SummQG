@@ -412,14 +412,26 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 continue
 
             inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+            mask_token = tokenizer.mask_token
+            if mask_token is None:
+                print("Model does not have a mask token")
+                print("Adding mask token to special tokens")
+                special_tokens_dict = {'mask_token': '<MASK>'}
+                tokenizer.add_special_tokens(special_tokens_dict)
+            else:
+                print("Using model's mask token")
+
+            mask_token_id = tokenizer.mask_token_id
             if labels is not None:
                 for block in range(len(labels)):
                     for i in range(len(labels[block])):
                         if labels[block][i] == tokenizer.convert_tokens_to_ids('[question]'):
-                            labels[block][i] = -100
+                            # labels[block][i] = -100 # throws an error. Need to find the right label for masking
+                            labels[block][i] = mask_token_id
                             break
                         else:
-                            labels[block][i] = -100
+                            # labels[block][i] = -100 # throws an error
+                            labels[block][i] = mask_token_id
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
