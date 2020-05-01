@@ -154,6 +154,7 @@ class SummQGTextDataset(Dataset):
             directory, args.model_type + "_cached_lm_" + str(block_size) + "_" + filename
         )
 
+
         if os.path.exists(cached_features_file) and not args.overwrite_cache:
             logger.info("Loading features from cached file %s", cached_features_file)
             with open(cached_features_file, "rb") as handle:
@@ -174,14 +175,26 @@ class SummQGTextDataset(Dataset):
             else:
                 print("Using model's pad token")
 
+            mask_token = tokenizer.mask_token
+            if mask_token is None:
+                print("Model does not have a mask token")
+                print("Adding mask token to special tokens")
+                special_tokens_dict = {'mask_token': '<MASK>'}
+                tokenizer.add_special_tokens(special_tokens_dict)
+            else:
+                print("Using model's mask token")
+
             pad_token_id = tokenizer.pad_token_id
             for line in lines:
                 tokenized_text = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(line))
                 pos = 0
                 while pos < len(tokenized_text):
                     if pos + block_size > len(tokenized_text):
-                        padded_text = [pad_token_id for i in range(pos+block_size-len(tokenized_text))]
-                        self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[pos:len(tokenized_text)].extend(padded_text)))
+                        padded_text = []
+                        for i in range(pos + block_size - len(tokenized_text)):
+                            padded_text.append(pad_token_id)
+                        inp = tokenized_text[pos:len(tokenized_text)] + padded_text
+                        self.examples.append(tokenizer.build_inputs_with_special_tokens(inp))
                     else:
                         self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[pos: pos + block_size]))
 
@@ -409,13 +422,17 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 continue
 
             inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+
+            mask_token_id = tokenizer.mask_token_id
             if labels is not None:
                 for block in range(len(labels)):
                     for i in range(len(labels[block])):
-                        if labels[block][i] == tokenizer.convert_tokens_to_ids('EOA'): #or whatever id is assigned to the [EOA] token
+                        if labels[block][i] == tokenizer.convert_tokens_to_ids('[question]'):
+                            labels[block][i] = mask_token_id
                             break
                         else:
-                            labels[block][i] = -100
+                            labels[block][i] = mask_token_id
+                            
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
