@@ -180,8 +180,11 @@ class SummQGTextDataset(Dataset):
                 pos = 0
                 while pos < len(tokenized_text):
                     if pos + block_size > len(tokenized_text):
-                        padded_text = [pad_token_id for i in range(pos+block_size-len(tokenized_text))]
-                        self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[pos:len(tokenized_text)].extend(padded_text)))
+                        padded_text = []
+                        for i in range(pos + block_size - len(tokenized_text)):
+                            padded_text.append(pad_token_id)
+                        inp = tokenized_text[pos:len(tokenized_text)] + padded_text
+                        self.examples.append(tokenizer.build_inputs_with_special_tokens(inp))
                     else:
                         self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[pos: pos + block_size]))
 
@@ -409,6 +412,14 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 continue
 
             inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+            if labels is not None:
+                for block in range(len(labels)):
+                    for i in range(len(labels[block])):
+                        if labels[block][i] == tokenizer.convert_tokens_to_ids('[question]'):
+                            labels[block][i] = -100
+                            break
+                        else:
+                            labels[block][i] = -100
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
