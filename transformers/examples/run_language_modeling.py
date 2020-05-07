@@ -443,23 +443,18 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                             attention_mask_inner.append(1)
 
                         if not question_reached:
-                            # labels[block][i] = -100 # throws an error. Need to find the right label for masking
+                            # labels[block][i] = -100 # throws an error
                             labels[block][i] = mask_token_id
 
                         if labels[block][i] == question_token_id:
                             # labels[block][i] = -100 # throws an error. Need to find the right label for masking
-                      #      labels[block][i] = mask_token_id
-                            question_reached=True
-                      #      break
-                      #  else:
-                      #      # labels[block][i] = -100 # throws an error
-                      #      labels[block][i] = mask_token_id
+                            question_reached = True
 
                     attention_mask.append(attention_mask_inner)
-
             attention_mask_tensor = torch.tensor(attention_mask)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
+            attention_mask_tensor = attention_mask_tensor.to(args.device)
             model.train()
             outputs = model(inputs, masked_lm_labels=labels, attention_mask=attention_mask_tensor)\
                 if args.mlm else model(inputs, labels=labels, attention_mask=attention_mask_tensor)
@@ -915,4 +910,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
