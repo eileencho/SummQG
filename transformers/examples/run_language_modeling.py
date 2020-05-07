@@ -143,6 +143,7 @@ class LineByLineTextDataset(Dataset):
     def __getitem__(self, i):
         return torch.tensor(self.examples[i], dtype=torch.long)
 
+
 class SummQGTextDataset(Dataset):
     def __init__(self, tokenizer: PreTrainedTokenizer, args, file_path: str, block_size=512):
         assert os.path.isfile(file_path)
@@ -153,7 +154,6 @@ class SummQGTextDataset(Dataset):
         cached_features_file = os.path.join(
             directory, args.model_type + "_cached_lm_" + str(block_size) + "_" + filename
         )
-
 
         if os.path.exists(cached_features_file) and not args.overwrite_cache:
             logger.info("Loading features from cached file %s", cached_features_file)
@@ -425,10 +425,8 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
             pad_token_id = tokenizer.pad_token_id
             question_token_id = tokenizer.convert_tokens_to_ids('[question]')
             mask_token_id = tokenizer.mask_token_id
-            attention_mask = []
             if labels is not None:
                 for block in range(len(labels)):
-                    attention_mask_inner = []
                     pad_reached = False
                     question_reached = False
 
@@ -438,10 +436,7 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                             pad_reached = True
 
                         if pad_reached:
-                            attention_mask_inner.append(0)
                             labels[block][i] = mask_token_id
-                        else:
-                            attention_mask_inner.append(1)
 
                         if not question_reached:
                             # labels[block][i] = -100 # throws an error
@@ -451,10 +446,8 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                             # labels[block][i] = -100 # throws an error. Need to find the right label for masking
                             question_reached = True
 
-                    attention_mask.append(attention_mask_inner)
             # attention_mask_tensor = torch.tensor(attention_mask)
             # print(attention_mask_tensor)
-            print(labels)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             # attention_mask_tensor = attention_mask_tensor.to(args.device)
