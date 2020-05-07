@@ -439,6 +439,7 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
 
                         if pad_reached:
                             attention_mask_inner.append(0)
+                            labels[block][i] = mask_token_id
                         else:
                             attention_mask_inner.append(1)
 
@@ -451,13 +452,16 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                             question_reached = True
 
                     attention_mask.append(attention_mask_inner)
-            attention_mask_tensor = torch.tensor(attention_mask)
+            # attention_mask_tensor = torch.tensor(attention_mask)
+            # print(attention_mask_tensor)
+            print(labels)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
-            attention_mask_tensor = attention_mask_tensor.to(args.device)
+            # attention_mask_tensor = attention_mask_tensor.to(args.device)
             model.train()
-            outputs = model(inputs, masked_lm_labels=labels, attention_mask=attention_mask_tensor)\
-                if args.mlm else model(inputs, labels=labels, attention_mask=attention_mask_tensor)
+            # outputs = model(inputs, masked_lm_labels=labels, attention_mask=attention_mask_tensor)\
+            #     if args.mlm else model(inputs, labels=labels, attention_mask=attention_mask_tensor)
+            outputs = model(inputs, masked_lm_labels=labels) if args.mlm else model(inputs, labels=labels)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
             if args.n_gpu > 1:
