@@ -20,6 +20,8 @@
 
 import argparse
 import logging
+import csv
+from csv import DictReader
 
 import numpy as np
 import torch
@@ -164,7 +166,9 @@ def main():
         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
 
-    parser.add_argument("--prompt", type=str, default="")
+    parser.add_argument("--output_path", default=None, required=True,type=str)
+    parser.add_argument("--prompts_path",  default=None, required=True,type=str)
+
     parser.add_argument("--length", type=int, default=20)
     parser.add_argument("--stop_token", type=str, default=None, help="Token at which text generation is stopped")
 
@@ -179,6 +183,7 @@ def main():
     )
     parser.add_argument("--k", type=int, default=0)
     parser.add_argument("--p", type=float, default=0.9)
+
 
     parser.add_argument("--padding_text", type=str, default="", help="Padding text for Transfo-XL and XLNet.")
     parser.add_argument("--xlm_language", type=str, default="", help="Optional language when used with the XLM model.")
@@ -207,56 +212,85 @@ def main():
     args.length = adjust_length_to_model(args.length, max_sequence_length=model.config.max_position_embeddings)
     logger.info(args)
 
-    prompt_text = args.prompt if args.prompt else input("Model prompt >>> ")
+    prompts_path = args.prompts_path
+    # prompt_text = args.prompt if args.prompt else input("Model prompt >>> ")
+    with open(prompts_path, 'r') as read_obj:
+        dict_reader = DictReader(read_obj)
+        prompts = list(dict_reader)
 
     # Different models need different input formatting and/or extra arguments
     requires_preprocessing = args.model_type in PREPROCESSING_FUNCTIONS.keys()
     if requires_preprocessing:
         prepare_input = PREPROCESSING_FUNCTIONS.get(args.model_type)
-        preprocessed_prompt_text = prepare_input(args, model, tokenizer, prompt_text)
-        encoded_prompt = tokenizer.encode(
-            preprocessed_prompt_text, add_special_tokens=False, return_tensors="pt", add_space_before_punct_symbol=True
-        )
-    else:
-        encoded_prompt = tokenizer.encode(prompt_text, add_special_tokens=False, return_tensors="pt")
-    encoded_prompt = encoded_prompt.to(args.device)
 
-    output_sequences = model.generate(
-        input_ids=encoded_prompt,
-        max_length=args.length + len(encoded_prompt[0]),
-        temperature=args.temperature,
-        top_k=args.k,
-        top_p=args.p,
-        repetition_penalty=args.repetition_penalty,
-        do_sample=True,
-        num_return_sequences=args.num_return_sequences,
-    )
+    count = 0
+    count_skipped = 0
+    output = []
+    for prompt in prompts:
 
-    # Remove the batch dimension when returning multiple sequences
-    if len(output_sequences.shape) > 2:
-        output_sequences.squeeze_()
+        count+=1
+        print(count)
+        if requires_preprocessing:
+            preprocessed_prompt_text = prepare_input(args, model, tokenizer, prompt['prompt'])
 
-    generated_sequences = []
+            encoded_prompt = tokenizer.encode(
+                preprocessed_prompt_text, add_special_tokens=False, return_tensors="pt", add_space_before_punct_symbol=True
+            )
+        else:
+            encoded_prompt = tokenizer.encode(prompt['prompt'], add_special_tokens=False, return_tensors="pt")
 
-    for generated_sequence_idx, generated_sequence in enumerate(output_sequences):
-        print("=== GENERATED SEQUENCE {} ===".format(generated_sequence_idx + 1))
-        generated_sequence = generated_sequence.tolist()
+        print(len(encoded_prompt[0]))
 
-        # Decode text
-        text = tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)
+        if len(encoded_prompt[0]) > 1005:
+            count_skipped+=1
+            continue
 
-        # Remove all text after the stop token
-        text = text[: text.find(args.stop_token) if args.stop_token else None]
+        encoded_prompt = encoded_prompt.to(args.device)
 
-        # Add the prompt at the beginning of the sequence. Remove the excess text that was used for pre-processing
-        total_sequence = (
-            prompt_text + text[len(tokenizer.decode(encoded_prompt[0], clean_up_tokenization_spaces=True)) :]
+        output_sequences = model.generate(
+            input_ids=encoded_prompt,
+            max_length=args.length + len(encoded_prompt[0]),
+            temperature=args.temperature,
+            top_k=args.k,
+            top_p=args.p,
+            repetition_penalty=args.repetition_penalty,
+            do_sample=True,
+            num_return_sequences=args.num_return_sequences,
         )
 
-        generated_sequences.append(total_sequence)
-        print(total_sequence)
+        # Remove the batch dimension when returning multiple sequences
+        if len(output_sequences.shape) > 2:
+            output_sequences.squeeze_()
 
-    return generated_sequences
+        generated_sequences = []
+
+        for generated_sequence_idx, generated_sequence in enumerate(output_sequences):
+            # print("=== GENERATED SEQUENCE {} ===".format(generated_sequence_idx + 1))
+            generated_sequence = generated_sequence.tolist()
+
+            # Decode text
+            text = tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)
+
+            # Remove all text after the stop token
+            text = text[: text.find(args.stop_token) if args.stop_token else None]
+
+            # Add the prompt at the beginning of the sequence. Remove the excess text that was used for pre-processing
+            total_sequence = text[len(tokenizer.decode(encoded_prompt[0], clean_up_tokenization_spaces=True)):]
+
+            generated_sequences.append(total_sequence)
+            # print(total_sequence)
+        prompt['generated_question'] = generated_sequences
+        output.append(prompt)
+
+    output_path = args.output_path
+    print('\nSkipped: %s' % count_skipped)
+    with open(output_path, 'w') as output_file:
+        dict_writer = csv.DictWriter(output_file, ['prompt', 'gold_standard_question', 'generated_question'])
+        dict_writer.writeheader()
+        dict_writer.writerows(output)
+
+    #
+    # return generated_sequences
 
 
 if __name__ == "__main__":
